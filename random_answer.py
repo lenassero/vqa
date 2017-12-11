@@ -9,7 +9,7 @@ import random
 import json
 import os
 
-from vqa_api_2.PythonHelperTools.vqaTools.vqa import VQA
+from vqa_api.PythonHelperTools.vqaTools.vqa import VQA
 from tools import ann_file, ques_file, img_dir
 from collections import Counter
 
