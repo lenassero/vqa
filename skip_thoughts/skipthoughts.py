@@ -14,6 +14,7 @@ import nltk
 from collections import OrderedDict, defaultdict
 from scipy.linalg import norm
 from nltk.tokenize import word_tokenize
+from tqdm import tqdm
 
 profile = False
 
@@ -123,7 +124,7 @@ def encode(model, X, use_norm=True, verbose=True, batch_size=128, use_eos=False)
         ds[len(s)].append(i)
 
     # Get features. This encodes by length, in order to avoid wasting computation
-    for k in ds.keys():
+    for k in tqdm(ds.keys()):
         if verbose:
             print k
         numbatches = len(ds[k]) / batch_size + 1
