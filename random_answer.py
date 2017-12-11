@@ -9,7 +9,7 @@ import random
 import json
 import os
 
-from vqa_api.PythonHelperTools.vqaTools.vqa import VQA
+from vqa_api_2.PythonHelperTools.vqaTools.vqa import VQA
 from tools import ann_file, ques_file, img_dir
 from collections import Counter
 
@@ -32,14 +32,14 @@ class RandomAnswer():
 
 		# Initialize VQA api for each dataSubType
 		for dataSubType in dataSubTypes:
-			print("--> {}".format(dataSubType))
+			print "--> {}".format(dataSubType)
 			setattr(self, "vqa_{}".format(dataSubType), 
 				VQA(getattr(self, "annFile_{}".format(dataSubType)), getattr(self, "quesFile_{}".format(dataSubType))))
 
 		# Merge the annotations of the two different dataSubTypes
 		self.annotations = getattr(self, "vqa_{}".format(dataSubTypes[0])).dataset["annotations"]
 		if len(dataSubTypes) > 1:
-			print("--> Merging the annotations of the different dataSubTypes")
+			print "--> Merging the annotations of the different dataSubTypes"
 			for dataSubType in dataSubTypes[1:]:
 				self.annotations += getattr(self, "vqa_{}".format(dataSubType)).dataset["annotations"]
 
@@ -64,7 +64,7 @@ class RandomAnswer():
 		res = [{"answer": random.choice(self.top_answers), "question_id": question_id} 
 		for question_id in question_ids_test]
 
-		print("--> Saving the results")
+		print "--> Saving the results"
 		with open(os.path.join(
 			self.dataDir, "Results/{}_{}_{}_{}_results.json".format(
 				self.taskType, self.dataType, dataSubType, self.__class__.__name__)), "w") as f:
