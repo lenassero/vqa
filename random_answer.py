@@ -10,7 +10,7 @@ import json
 import os
 
 from vqa_api.PythonHelperTools.vqaTools.vqa import VQA
-from tools import ann_file, ques_file, img_dir
+from tools import ann_file, ques_file, img_dir, save_results
 from collections import Counter
 
 class RandomAnswer():
@@ -64,13 +64,9 @@ class RandomAnswer():
 		res = [{"answer": random.choice(self.top_answers), "question_id": question_id} 
 		for question_id in question_ids_test]
 
-		print "--> Saving the results"
-		with open(os.path.join(
-			self.dataDir, "Results/{}_{}_{}_{}_results.json".format(
-				self.taskType, self.dataType, dataSubType, self.__class__.__name__)), "w") as f:
-		    json.dump(res, f)
-
-
+		# Save the results
+		save_results(res, self.dataDir, self.taskType, self.dataType, dataSubType, 
+			         self.__class__.__name__)
 		
 
 
