@@ -57,7 +57,7 @@ class SkipThoughts():
         self.model = skipthoughts.load_model()
         self.encoder = skipthoughts.Encoder(self.model)
 
-    def encode_train_questions(self, n=1000):
+    def encode_train_questions(self):
         """Encode questions from the training set.
         """
 
@@ -75,9 +75,9 @@ class SkipThoughts():
         else:
             # List of questions and their corresponding ids
             questions = [dic["question"]
-                         for dic in self.questions["questions"]][:n]
+                         for dic in self.questions["questions"]]
             question_ids = [dic["question_id"]
-                            for dic in self.questions["questions"]][:n]
+                            for dic in self.questions["questions"]]
 
             # Encode the questions of the train set
             self.vectors_train = self.encoder.encode(questions)
@@ -96,7 +96,7 @@ class SkipThoughts():
             with open(vectors_train_idx_to_qid_file, "w") as f:
                 pkl.dump(self.vectors_train_idx_to_qid, f)
 
-    def encode_test_questions(self, n=1000):
+    def encode_test_questions(self):
         """Encode questions from the test set.
         """
 
@@ -126,9 +126,9 @@ class SkipThoughts():
 
             # List of questions and their corresponding ids
             questions = [dic["question"]
-                         for dic in self.questions_test["questions"]][:n]
+                         for dic in self.questions_test["questions"]]
             question_ids = [dic["question_id"]
-                            for dic in self.questions_test["questions"]][:n]
+                            for dic in self.questions_test["questions"]]
 
             # Encode the questions of the train set
             self.vectors_test = self.encoder.encode(questions)
