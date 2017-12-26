@@ -30,6 +30,9 @@ def qtypes_file(dataDir, dataType="mscoco"):
                             format(dataType))
     return filename
 
+def img_file(dataSubType, imgId):
+    filename = ".".join(("_".join(("COCO", dataSubType, str(imgId).zfill(12))), "jpg"))
+    return filename
 
 def skipthoughts_npy_file(dataDir, taskType, dataType, dataSubTypes):
     if type(dataSubTypes) == list:
