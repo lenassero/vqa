@@ -49,7 +49,7 @@ class SkipThoughts():
         if len(dataSubTypesTrain) > 1:
             print "--> Merging the annotations of the different dataSubTypesTrain"
             for dataSubType in dataSubTypesTrain[1:]:
-                self.annotations += getattr(self,
+                self.questions += getattr(self,
                                             "vqa_{}".format(dataSubType))\
                                             .questions
 
