@@ -45,13 +45,13 @@ class SkipThoughts():
 
         # Merge the questions of the two different dataSubTypesTrain
         self.questions = getattr(
-            self, "vqa_{}".format(dataSubTypesTrain[0])).questions
+            self, "vqa_{}".format(dataSubTypesTrain[0])).questions["questions"]
         if len(dataSubTypesTrain) > 1:
             print "--> Merging the annotations of the different dataSubTypesTrain"
             for dataSubType in dataSubTypesTrain[1:]:
                 self.questions += getattr(self,
                                             "vqa_{}".format(dataSubType))\
-                                            .questions
+                                            .questions["questions"]
 
         # Load the skipthoughts model and initialize the encoder
         self.model = skipthoughts.load_model()
@@ -75,9 +75,9 @@ class SkipThoughts():
         else:
             # List of questions and their corresponding ids
             questions = [dic["question"]
-                         for dic in self.questions["questions"]]
+                         for dic in self.questions
             question_ids = [dic["question_id"]
-                            for dic in self.questions["questions"]]
+                            for dic in self.questions]
 
             # Encode the questions of the train set
             self.vectors_train = self.encoder.encode(questions)
@@ -126,9 +126,9 @@ class SkipThoughts():
 
             # List of questions and their corresponding ids
             questions = [dic["question"]
-                         for dic in self.questions_test["questions"]]
+                         for dic in self.questions_test]
             question_ids = [dic["question_id"]
-                            for dic in self.questions_test["questions"]]
+                            for dic in self.questions_test]
 
             # Encode the questions of the train set
             self.vectors_test = self.encoder.encode(questions)
