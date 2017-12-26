@@ -34,35 +34,56 @@ def img_file(dataSubType, imgId):
     filename = ".".join(("_".join(("COCO", dataSubType, str(imgId).zfill(12))), "jpg"))
     return filename
 
-def skipthoughts_npy_file(dataDir, taskType, dataType, dataSubTypes):
+def skipthoughts_npy_file(dataDir, taskType, dataType, dataSubTypes, n):
     if type(dataSubTypes) == list:
         dataSubTypes = dataSubTypes
     else:
         dataSubTypes = [dataSubTypes]
-        
-    filename = os.path.join(dataDir, "Embeddings",
-                            "{}_{}_{}_skipthoughts.npy"
-                            .format(taskType, dataType, "_".join(dataSubTypes)))
+
+    if not n:        
+        filename = os.path.join(dataDir, "Embeddings",
+                                "{}_{}_{}_skipthoughts.npy"
+                                .format(taskType, dataType, "_".join(dataSubTypes)))
+    else:
+        filename = os.path.join(dataDir, "Embeddings",
+                        "{}_{}_{}_skipthoughts_{}.npy"
+                        .format(taskType, dataType, "_".join(dataSubTypes), n))
+
     return filename
 
-def skipthoughts_idx_to_qid_file(dataDir, taskType, dataType, dataSubTypes):
+def skipthoughts_idx_to_qid_file(dataDir, taskType, dataType, dataSubTypes, n):
     if type(dataSubTypes) == list:
         dataSubTypes = dataSubTypes
     else:
         dataSubTypes = [dataSubTypes]
-    filename = os.path.join(dataDir, "Embeddings",
-                            "{}_{}_{}_skipthoughts_idx_to_qid.pkl"
-                            .format(taskType, dataType, "_".join(dataSubTypes)))
+
+    if not n:
+        filename = os.path.join(dataDir, "Embeddings",
+                                "{}_{}_{}_skipthoughts_idx_to_qid.pkl"
+                                .format(taskType, dataType, "_".join(dataSubTypes)))
+    else:
+        filename = os.path.join(dataDir, "Embeddings",
+                                "{}_{}_{}_skipthoughts_idx_to_qid_{}.pkl"
+                                .format(taskType, dataType, "_".join(dataSubTypes), n))
     return filename
 
-def skipthoughts_test_qid_to_train_knn_qids_file(dataDir, taskType, dataType, dataSubTypesTrain, dataSubTypeTest, k):
+def skipthoughts_test_qid_to_train_knn_qids_file(dataDir, taskType, dataType, 
+    dataSubTypesTrain, dataSubTypeTest, k, n_train, n_test):
     if type(dataSubTypesTrain) == list:
         dataSubTypesTrain = dataSubTypesTrain
     else:
         dataSubTypesTrain = [dataSubTypesTrain]
-    filename = os.path.join(dataDir, "Embeddings",
-                            "{}_{}_skipthoughts_{}_qid_to_{}_{}nn_qids.pkl"
-                            .format(taskType, dataType, dataSubTypeTest, "_".join(dataSubTypesTrain), k))
+
+    if not n_train and not n_test :
+        filename = os.path.join(dataDir, "Embeddings",
+                                "{}_{}_skipthoughts_{}_qid_to_{}_{}nn_qids.pkl"
+                                .format(taskType, dataType, dataSubTypeTest, 
+                                    "_".join(dataSubTypesTrain), k))
+    else:
+        filename = os.path.join(dataDir, "Embeddings",
+                                "{}_{}_skipthoughts_{}_{}_qid_to_{}_{}_{}nn_qids.pkl"
+                                .format(taskType, dataType, dataSubTypeTest, 
+                                    n_test, "_".join(dataSubTypesTrain), n_test, k))
     return filename
 
 def save_results(results, dataDir, taskType, dataType, dataSubType, methodName):

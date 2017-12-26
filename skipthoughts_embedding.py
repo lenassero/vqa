@@ -14,7 +14,8 @@ from skip_thoughts import skipthoughts
 class SkipThoughts():
 
     def __init__(self, dataDir, versionType="", taskType="OpenEnded", dataType="mscoco",
-                 dataSubTypesTrain=["train2014"], dataSubTypeTest="val2014"):
+                 dataSubTypesTrain=["train2014"], dataSubTypeTest="val2014", 
+                 n_train=None):
 
         self.dataDir = dataDir
         self.versionType = versionType
@@ -44,14 +45,24 @@ class SkipThoughts():
                         getattr(self, "quesFile_{}".format(dataSubType))))
 
         # Merge the questions of the two different dataSubTypesTrain
-        self.questions = getattr(
+        self.questions_train = getattr(
             self, "vqa_{}".format(dataSubTypesTrain[0])).questions["questions"]
+        for dic in self.questions_train:
+            dic["data_subtype"] = dataSubTypesTrain[0]
+
         if len(dataSubTypesTrain) > 1:
             print "--> Merging the annotations of the different dataSubTypesTrain"
             for dataSubType in dataSubTypesTrain[1:]:
-                self.questions += getattr(self,
-                                            "vqa_{}".format(dataSubType))\
-                                            .questions["questions"]
+                questions = getattr(self, "vqa_{}".format(dataSubType))\
+                                    .questions["questions"]
+                for dic in questions:
+                    dic["data_subtype"] = dataSubType
+                self.questions_train += questions
+
+        # Reduce the size of the train set
+        if n_train:
+            self.questions_train = self.questions_train[:n_train]
+        self.n_train = n_train
 
         # Load the skipthoughts model and initialize the encoder
         self.model = skipthoughts.load_model()
@@ -63,9 +74,9 @@ class SkipThoughts():
 
         # File name to save the array of vectors
         vectors_train_npy_file = skipthoughts_npy_file(
-            self.dataDir, self.taskType, self.dataType, self.dataSubTypesTrain)
+            self.dataDir, self.taskType, self.dataType, self.dataSubTypesTrain, self.n_train)
         vectors_train_idx_to_qid_file = skipthoughts_idx_to_qid_file(
-            self.dataDir, self.taskType, self.dataType, self.dataSubTypesTrain)
+            self.dataDir, self.taskType, self.dataType, self.dataSubTypesTrain, self.n_train)
 
         if os.path.exists(vectors_train_npy_file) and os.path.exists(vectors_train_idx_to_qid_file):
             self.vectors_train = np.load(vectors_train_npy_file)
@@ -75,9 +86,9 @@ class SkipThoughts():
         else:
             # List of questions and their corresponding ids
             questions = [dic["question"]
-                         for dic in self.questions
+                         for dic in self.questions_train]
             question_ids = [dic["question_id"]
-                            for dic in self.questions]
+                            for dic in self.questions_train]
 
             # Encode the questions of the train set
             self.vectors_train = self.encoder.encode(questions)
@@ -96,15 +107,14 @@ class SkipThoughts():
             with open(vectors_train_idx_to_qid_file, "w") as f:
                 pkl.dump(self.vectors_train_idx_to_qid, f)
 
-    def encode_test_questions(self):
+    def encode_test_questions(self, n_test=None):
         """Encode questions from the test set.
         """
-
         # File name to save the array of vectors
         vectors_test_npy_file = skipthoughts_npy_file(
-            self.dataDir, self.taskType, self.dataType, self.dataSubTypeTest)
+            self.dataDir, self.taskType, self.dataType, self.dataSubTypeTest, n_test)
         vectors_test_idx_to_qid_file = skipthoughts_idx_to_qid_file(
-            self.dataDir, self.taskType, self.dataType, self.dataSubTypeTest)
+            self.dataDir, self.taskType, self.dataType, self.dataSubTypeTest, n_test)
 
         if os.path.exists(vectors_test_npy_file) and os.path.exists(vectors_test_idx_to_qid_file):
             self.vectors_test = np.load(vectors_test_npy_file)
@@ -122,7 +132,13 @@ class SkipThoughts():
             # Initialize VQA api for the self.dataSubTypeTest on which to make predictions
             # on the answers
             self.vqa_test = VQA(self.annFile_test, self.quesFile_test)
-            self.questions_test = self.vqa_test.questions
+            self.questions_test = self.vqa_test.questions["questions"]
+            for dic in self.questions_test:
+                dic["data_subtype"] = self.dataSubTypeTest
+
+            # Reduce the size of the test set
+            self.questions_test = self.questions_test[:n_test]
+            self.n_test = n_test
 
             # List of questions and their corresponding ids
             questions = [dic["question"]
@@ -163,7 +179,8 @@ class SkipThoughts():
     def nearest_neighbors(self, k=4):
 
         test_qid_to_nn_train_qids_file = skipthoughts_test_qid_to_train_knn_qids_file(
-            self.dataDir, self.taskType, self.dataType, self.dataSubTypesTrain, self.dataSubTypeTest, k)
+            self.dataDir, self.taskType, self.dataType, self.dataSubTypesTrain, 
+            self.dataSubTypeTest, k, self.n_train, self.n_test)
 
         if os.path.exists(test_qid_to_nn_train_qids_file):
             with open(test_qid_to_nn_train_qids_file, "r") as f:
