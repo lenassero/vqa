@@ -114,6 +114,12 @@ class LSTMVGG():
         self.test_questions = [dic["question"]
                      for dic in self.questions_test]
 
+        # Keep track of the questions ids
+        self.train_questions_ids = [dic["question_id"]
+                     for dic in self.questions_train]
+        self.test_questions_ids = [dic["question_id"]
+                     for dic in self.questions_test]
+
         # Create the tokenizer
         tokenizer = Tokenizer()
 
@@ -149,10 +155,18 @@ class LSTMVGG():
         """
         # List of tuples (image_id, data_subtype)
         # Ex: (1, "train2014")
-        train_image_ids = list(set((dic["image_id"], dic["data_subtype"]) 
-                           for dic in self.questions_train))
-        test_image_ids = list(set((dic["image_id"], dic["data_subtype"]) 
-                           for dic in self.questions_test))
+        train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
+                           for dic in self.questions_train]
+        test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
+                           for dic in self.questions_test]
+
+        # Each image id is replicated three times (3 questions), let's reduce 
+        # the size of the above lists, to avoid encoding the same image three
+        # times
+        train_image_ids = [train_image_ids[i] 
+        for i in range(len(train_image_ids)) if i%3 == 0]
+        test_image_ids = [test_image_ids[i] 
+        for i in range(len(test_image_ids)) if i%3 == 0]
 
         self.train_images = self.process_images_(train_image_ids[:n])
         self.test_images = self.process_images_(test_image_ids[:n])
@@ -174,6 +188,7 @@ class LSTMVGG():
                 image_id[1]), img_file(image_id[1], image_id[0])), target_size=(224, 224)) 
             # Convert the image to an array
             img = image.img_to_array(img)
+            self.image_1 = img
             imgs.append(img)
 
         # Put the images together in a single array
@@ -232,11 +247,11 @@ class LSTMVGG():
 
         # Top n answers
         top_answers_train = [answer for (answer, occ) in 
-        Counter(self.answers_train).most_common(top_n)]
+        Counter(answers_train).most_common(top_n)]
 
         # Dictionary mapping an index a top answer
         self.idx_to_answer = {i: answer for (i, answer) 
-                              in zip(range(top_n), self.top_answers_train)}
+                              in zip(range(top_n), top_answers_train)}
         # Inverse dictionary mapping a top answer to an index
         self.answer_to_idx = {answer: i for (i, answer) 
                               in self.idx_to_answer.items()}
