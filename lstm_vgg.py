@@ -250,11 +250,11 @@ class LSTMVGG():
         Counter(answers_train).most_common(top_n)]
 
         # Dictionary mapping an index a top answer
-        self.idx_to_answer = {i: answer for (i, answer) 
+        self.idx_to_answer_dic = {i: answer for (i, answer) 
                               in zip(range(top_n), top_answers_train)}
         # Inverse dictionary mapping a top answer to an index
-        self.answer_to_idx = {answer: i for (i, answer) 
-                              in self.idx_to_answer.items()}
+        self.answer_to_idx_dic = {answer: i for (i, answer) 
+                              in self.idx_to_answer_dic.items()}
 
     def encode_answers(self):
         """Encode train and test answers and turn the indices into categorical 
@@ -280,11 +280,61 @@ class LSTMVGG():
         list(int)
             List of answers as indices (from 0 to top_n).
         """
-        answers_ind = [self.answer_to_idx[answer]
-                       if answer in self.answer_to_idx.keys() else self.top_n
+        answers_ind = [self.answer_to_idx_dic[answer]
+                       if answer in self.answer_to_idx_dic.keys() else self.top_n
                        for answer in answers]
         return answers_ind
 
+    def idx_to_answer(self, idx):
+        """Return the answer corresponding to an index (from 0 to 999).
+        Parameters
+        ----------
+        idx : int
+            Index of the answer resulting from the encoding of the answers.
+        
+        Returns
+        -------
+        str
+            Answer.
+        """
+        if idx == 999:
+            return "None"
+        else:
+            return self.idx_to_answer_dic[idx]
 
+    def predictions_to_dic(self, predictions, question_ids):
+        """Turn the predictions from the model to the a result list as 
+        required by the evaluation tool.
+        
+        Parameters
+        ----------
+        predictions : array, shape = [n, 1000]
+            Array resulting from the predict function, n is the number of 
+            question/image pair for which we have predicted an answer.
+        question_ids : list(int)
+            Question ids corresponding to the questions on which we make 
+            predictions.
+        
+        Returns
+        -------
+        TYPE
+            Description
+        """
+        # Predicted answers (as indices)
+        answers_ind_pred = np.argmax(predictions, axis=1)
+
+        # Predicted answers (as strings)
+        idx_to_answer = np.vectorize(self.idx_to_answer)
+        answers_pred = idx_to_answer(answers_ind_pred)
+
+        # Result list [{"answer": "yes", "question_id": 1}] 
+        res = [{"answer": answer, "question_id": question_id} 
+        for (answer, question_id) in zip(answers_pred, question_ids)]
+
+        # Save the results
+        # save_results(res, self.dataDir, self.taskType, self.dataType, dataSubType, 
+        #              self.__class__.__name__)
+
+        return res
 
 
