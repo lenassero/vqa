@@ -21,8 +21,10 @@ profile = False
 #-----------------------------------------------------------------------------#
 # Specify model and table locations here
 #-----------------------------------------------------------------------------#
-path_to_models = 'C:/Users/Nasser Benab/Documents/git/data/skip-thoughts'
-path_to_tables = 'C:/Users/Nasser Benab/Documents/git/data/skip-thoughts'
+#path_to_models = 'C:/Users/Nasser Benab/Documents/git/data/skip-thoughts'
+#path_to_tables = 'C:/Users/Nasser Benab/Documents/git/data/skip-thoughts'
+path_to_models = '/Users/adib/Documents/Cours/Projet/OR/VQA/skipthoughts_data'
+path_to_tables = '/Users/adib/Documents/Cours/Projet/OR/VQA/skipthoughts_data'
 #-----------------------------------------------------------------------------#
 
 path_to_umodel = os.path.join(path_to_models, 'uni_skip.npz')
