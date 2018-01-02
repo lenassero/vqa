@@ -213,7 +213,7 @@ class LSTMVGG():
         imgs = np.stack(imgs)
 
         # Preprocess the images (VGG16 input)
-        # imgs = preprocess_input(imgs)   
+        imgs = preprocess_input(imgs)   
 
         # Duplicate the array for each image three times to correspond to the 
         # number of training questions
