@@ -102,28 +102,31 @@ class LSTMVGG():
         # Test annotations
         self.annotations_test = self.vqa_test.dataset["annotations"]
 
-    def tokenize_questions(self):
-        """ Train a tokenizer on the training set questions and tokenize the 
-        train and set questions. The resulting sequences are padded to a 
-        maximum length corresponding to the longest sentence in the training
-        set.
-        """
-        # List of questions
-        self.train_questions = [dic["question"]
-                     for dic in self.questions_train]
-        self.test_questions = [dic["question"]
-                     for dic in self.questions_test]
-
         # Keep track of the questions ids
         self.train_questions_ids = [dic["question_id"]
                      for dic in self.questions_train]
         self.test_questions_ids = [dic["question_id"]
                      for dic in self.questions_test]
 
+    def tokenize_questions(self):
+        """ Train a tokenizer on the training set questions and tokenize the 
+        train and set questions. The resulting sequences are padded to a 
+        maximum length corresponding to the longest sentence in the training
+        set.
+        """
+        # List of questions (we select only the questions in the training set
+        # that correspond to answers belonging to the top 1000 answers of the 
+        # training set)
+        self.test_questions = [dic["question"]
+                     for dic in self.questions_test]
+        self.train_questions = [dic["question"]
+                     for dic in self.questions_train]
+
         # Create the tokenizer
         tokenizer = Tokenizer()
 
         # Fit the tokenizer on the training set questions
+        print("Fitting the tokenizer on the training questions ...")
         tokenizer.fit_on_texts(self.train_questions)
 
         # Vocabulary size of the training set to be used for the embedding
@@ -131,6 +134,7 @@ class LSTMVGG():
         self.vocabulary_size_train = len(tokenizer.word_index.keys())
 
         # Let's use the embedding that has been fit on the training data
+        print("Embedding the train and test questions ...")
         train_sequences = tokenizer.texts_to_sequences(self.train_questions)
         test_sequences = tokenizer.texts_to_sequences(self.test_questions)
         
@@ -138,6 +142,8 @@ class LSTMVGG():
         self.input_length = max([len(sequence) for sequence in train_sequences])
 
         # Pad the sequences to a maximum length
+        print("Padding the sequences to a maximum length of {} ...".\
+              format(self.input_length))
         self.train_sequences = pad_sequences(train_sequences, 
                                                maxlen=self.input_length, 
                                                padding="post")
@@ -155,6 +161,8 @@ class LSTMVGG():
         """
         # List of tuples (image_id, data_subtype)
         # Ex: (1, "train2014")
+        # We select only images in the training set that correspond to answers 
+        # belonging to the top 1000 answers of the training set
         train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
                            for dic in self.questions_train]
         test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
@@ -163,10 +171,10 @@ class LSTMVGG():
         # Each image id is replicated three times (3 questions), let's reduce 
         # the size of the above lists, to avoid encoding the same image three
         # times
-        train_image_ids = [train_image_ids[i] 
-        for i in range(len(train_image_ids)) if i%3 == 0]
-        test_image_ids = [test_image_ids[i] 
-        for i in range(len(test_image_ids)) if i%3 == 0]
+        # train_image_ids = [train_image_ids[i] 
+        # for i in range(len(train_image_ids)) if i%3 == 0]
+        # test_image_ids = [test_image_ids[i] 
+        # for i in range(len(test_image_ids)) if i%3 == 0]
 
         self.train_images = self.process_images_(train_image_ids[:n])
         self.test_images = self.process_images_(test_image_ids[:n])
@@ -181,25 +189,35 @@ class LSTMVGG():
         """
         # List to store the arrays (each array is an image 224x224x3)
         imgs = []
+        # List of images that have been processed {image_id: idx}
+        image_ids_processed = {}
+        # Keep track of the first index corresponding to the first time an 
+        # image has been processed
+        i = 0
 
         for image_id in tqdm(image_ids):
-            # Resize the image (VGG16 input)
-            img = image.load_img(os.path.join(img_dir(self.dataDir, self.dataType, 
-                image_id[1]), img_file(image_id[1], image_id[0])), target_size=(224, 224)) 
-            # Convert the image to an array
-            img = image.img_to_array(img)
-            self.image_1 = img
+            if image_id[0] in image_ids_processed.keys():
+                img = imgs[image_ids_processed[image_id[0]]]
+            else:
+                # Resize the image (VGG16 input)
+                img = image.load_img(os.path.join(img_dir(self.dataDir, self.dataType, 
+                    image_id[1]), img_file(image_id[1], image_id[0])), target_size=(224, 224)) 
+                # Convert the image to an array
+                img = image.img_to_array(img)
+                # Increment i if the image has not been processed yet
+                image_ids_processed[image_id[0]] = i
+            i += 1
             imgs.append(img)
 
         # Put the images together in a single array
         imgs = np.stack(imgs)
 
         # Preprocess the images (VGG16 input)
-        imgs = preprocess_input(imgs)   
+        # imgs = preprocess_input(imgs)   
 
         # Duplicate the array for each image three times to correspond to the 
         # number of training questions
-        imgs = np.repeat(imgs, 3, axis=0)
+        # imgs = np.repeat(imgs, 3, axis=0)
 
         return imgs
 
@@ -207,8 +225,16 @@ class LSTMVGG():
         """Get the most common answer for each question of the train and test
         sets.
         """
+        # For the training set, we select only the answers belonging to the 
+        # top 1000 answers
         self.train_answers = self.get_most_common_answer_(self.annotations_train)
         self.test_answers = self.get_most_common_answer_(self.annotations_test)
+
+        # Add the ground truth answers in the questions dictionaries
+        for i in range(len(self.questions_train)):
+            self.questions_train[i]["answer"] = self.train_answers[i]
+        for i in range(len(self.questions_test)):
+            self.questions_test[i]["answer"] = self.test_answers[i]
 
     def get_most_common_answer_(self, annotations):
         """Get the most common answer per question (among the 10 answers).
@@ -221,14 +247,14 @@ class LSTMVGG():
         Returns
         -------
         list(str)
-            List of answers. 
+            List of answers (question_id, answer). 
         """
         answers = [Counter((annotation["answers"][i]["answer"] 
-                   for i in range(10))).most_common(1)[0][0] 
+                   for i in range(10))).most_common(1)[0][0]
                    for annotation in annotations]
         return answers
 
-    def get_top_answers(self, top_n=999):
+    def get_top_answers(self, top_n=1000):
         """Get the top_n answers from the train set (all 10 answers per 
         question are considered) and create dictionaries that map each top 
         answer to an index and vice-versa.
@@ -256,19 +282,34 @@ class LSTMVGG():
         self.answer_to_idx_dic = {answer: i for (i, answer) 
                               in self.idx_to_answer_dic.items()}
 
+    def reduce_train_qids(self):
+        """Reduce the training set question ids to the ones which are among the 
+        top 1000 answers of the training set.
+        """
+        self.train_questions_ids = [question_id for (question_id, answer) 
+        in zip(self.train_questions_ids, self.train_answers) 
+        if answer in self.answer_to_idx_dic.keys()]
+
+    def reduce_train_answers(self):
+        """Reduce the training set answers to the ones which are among the 
+        top 1000 answers of the training set.
+        """
+        self.train_answers = [answer for answer in self.train_answers if answer
+                              in self.answer_to_idx_dic.keys()]
+        self.questions_train = [question for question in self.questions_train 
+                                if question["answer"] in self.answer_to_idx_dic.keys()]
+
     def encode_answers(self):
-        """Encode train and test answers and turn the indices into categorical 
-        vectors.
+        """Encode train answers and turn the indices into categorical vectors.
         """
         self.train_answers_ind = self.encode_answers_(self.train_answers)
-        self.test_answers_ind = self.encode_answers_(self.test_answers)
         self.train_answers_categorical = to_categorical(self.train_answers_ind)
-        self.test_answers_categorical = to_categorical(self.test_answers_ind)
+        # self.test_answers_ind = self.encode_answers_(self.test_answers)
+        # self.test_answers_categorical = to_categorical(self.test_answers_ind)
 
     def encode_answers_(self, answers):
         """Encode answers according to the top_n most frequent answers of the 
-        training set (from 0 to top_n-1). The answer which is not found among the 
-        top_n answers from the training set is encoded as top_n.
+        training set (from 0 to top_n-1).
         
         Parameters
         ----------
@@ -278,11 +319,9 @@ class LSTMVGG():
         Returns
         -------
         list(int)
-            List of answers as indices (from 0 to top_n).
+            List of answers as indices (from 0 to top_n-1).
         """
-        answers_ind = [self.answer_to_idx_dic[answer]
-                       if answer in self.answer_to_idx_dic.keys() else self.top_n
-                       for answer in answers]
+        answers_ind = [self.answer_to_idx_dic[answer] for answer in answers]
         return answers_ind
 
     def idx_to_answer(self, idx):
@@ -297,10 +336,7 @@ class LSTMVGG():
         str
             Answer.
         """
-        if idx == 999:
-            return "None"
-        else:
-            return self.idx_to_answer_dic[idx]
+        return self.idx_to_answer_dic[idx]
 
     def predictions_to_dic(self, predictions, question_ids):
         """Turn the predictions from the model to the a result list as 
