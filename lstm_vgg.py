@@ -165,8 +165,6 @@ class LSTMVGG():
         # belonging to the top 1000 answers of the training set
         train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
                            for dic in self.questions_train]
-        test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
-                           for dic in self.questions_test]
 
         # Each image id is replicated three times (3 questions), let's reduce 
         # the size of the above lists, to avoid encoding the same image three
@@ -177,7 +175,6 @@ class LSTMVGG():
         # for i in range(len(test_image_ids)) if i%3 == 0]
 
         self.train_images = self.process_images_(train_image_ids[:n])
-        self.test_images = self.process_images_(test_image_ids[:n])
 
     def process_images_test(self, n=100):
         """Resize train and test images and prepocess them accordingly to VGG16
