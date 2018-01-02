@@ -150,7 +150,7 @@ class LSTMVGG():
         self.test_sequences = pad_sequences(test_sequences, 
                                                maxlen=self.input_length, 
                                                padding="post")
-    def process_images(self, n=100):
+    def process_images_train(self, n=100):
         """Resize train and test images and prepocess them accordingly to VGG16
         input.
         
@@ -178,6 +178,24 @@ class LSTMVGG():
 
         self.train_images = self.process_images_(train_image_ids[:n])
         self.test_images = self.process_images_(test_image_ids[:n])
+
+    def process_images_test(self, n=100):
+        """Resize train and test images and prepocess them accordingly to VGG16
+        input.
+        
+        Parameters
+        ----------
+        n : int, optional
+            Number of images to process (for both the train and test sets).
+        """
+        # List of tuples (image_id, data_subtype)
+        # Ex: (1, "train2014")
+        # We select only images in the training set that correspond to answers 
+        # belonging to the top 1000 answers of the training set
+        test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
+                           for dic in self.questions_test]
+        self.test_images = self.process_images_(test_image_ids[:n])
+
 
     def process_images_(self, image_ids):
         """Resize images and preprocess them accordingly to VGG16 input.
