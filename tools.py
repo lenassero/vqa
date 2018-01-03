@@ -34,6 +34,11 @@ def img_file(dataSubType, imgId):
     filename = ".".join(("_".join(("COCO", dataSubType, str(imgId).zfill(12))), "jpg"))
     return filename
 
+def glove_dir(dataDir):
+    dirname = os.path.join(dataDir, "Glove")
+    return dirname
+
+
 def skipthoughts_npy_file(dataDir, taskType, dataType, dataSubTypes, n):
     if type(dataSubTypes) == list:
         dataSubTypes = dataSubTypes

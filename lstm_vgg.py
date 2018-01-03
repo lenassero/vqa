@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import keras
 import sys
 import os
 
@@ -12,9 +13,10 @@ from keras.preprocessing.text import Tokenizer
 from keras.utils import to_categorical
 from keras.preprocessing import image
 from collections import Counter
+from keras.models import Model
 from tqdm import tqdm
 
-from tools import ann_file, ques_file, img_dir, img_file
+from tools import ann_file, ques_file, img_dir, img_file, glove_dir
 
 class LSTMVGG():
 
@@ -102,11 +104,11 @@ class LSTMVGG():
         # Test annotations
         self.annotations_test = self.vqa_test.dataset["annotations"]
 
-        # Keep track of the questions ids
-        self.train_questions_ids = [dic["question_id"]
-                     for dic in self.questions_train]
-        self.test_questions_ids = [dic["question_id"]
-                     for dic in self.questions_test]
+        # # Keep track of the questions ids
+        # self.train_questions_ids = [dic["question_id"]
+        #              for dic in self.questions_train]
+        # self.test_questions_ids = [dic["question_id"]
+        #              for dic in self.questions_test]
 
     def tokenize_questions(self):
         """ Train a tokenizer on the training set questions and tokenize the 
@@ -123,20 +125,20 @@ class LSTMVGG():
                      for dic in self.questions_train]
 
         # Create the tokenizer
-        tokenizer = Tokenizer()
+        self.tokenizer = Tokenizer()
 
         # Fit the tokenizer on the training set questions
         print("Fitting the tokenizer on the training questions ...")
-        tokenizer.fit_on_texts(self.train_questions)
+        self.tokenizer.fit_on_texts(self.train_questions)
 
         # Vocabulary size of the training set to be used for the embedding
         # layer of the model
-        self.vocabulary_size_train = len(tokenizer.word_index.keys())
+        self.vocabulary_size_train = len(self.tokenizer.word_index.keys())
 
         # Let's use the embedding that has been fit on the training data
         print("Embedding the train and test questions ...")
-        train_sequences = tokenizer.texts_to_sequences(self.train_questions)
-        test_sequences = tokenizer.texts_to_sequences(self.test_questions)
+        train_sequences = self.tokenizer.texts_to_sequences(self.train_questions)
+        test_sequences = self.tokenizer.texts_to_sequences(self.test_questions)
         
         # Longest sentence in the training set
         self.input_length = max([len(sequence) for sequence in train_sequences])
@@ -150,6 +152,47 @@ class LSTMVGG():
         self.test_sequences = pad_sequences(test_sequences, 
                                                maxlen=self.input_length, 
                                                padding="post")
+
+    def create_embedding_matrix(self, embedding_dim=300):
+        """Create an embedding matrix of the training set vocabulary using Glove 
+        pre-trained embeddings.
+        
+        Parameters
+        ----------
+        embedding_dim : int, optional
+            Embedding dimension of the word vectors.
+        """
+        embedding_matrix_filename = os.path.join(glove_dir(self.dataDir), "embedding_matrix.npy")
+        if os.path.exists(embedding_matrix_filename):
+            self.embedding_matrix = np.load(embedding_matrix_filename)
+        else:            
+            # Load Glove embeddings (Wikipedia 2014 + Gigaword 5) and map each word
+            # to its embedding
+            embeddings_index = {}
+            f = open(os.path.join(glove_dir(self.dataDir), "glove.6B.{}d.txt".format(embedding_dim)))
+            print("Reading Glove embedding and creating an embedding index {word: embedding array} ...")
+            for line in tqdm(f):
+                values = line.split()
+                word = values[0]
+                coefs = np.asarray(values[1:], dtype="float32")
+                embeddings_index[word] = coefs
+            f.close()
+            print("--> Found {} word vectors in Glove embedding.".format(len(embeddings_index)))
+
+            # Create the embedding matrix mapping each word in the vocabulary to 
+            # each embedding vector found in Glove (0 if not)
+            print("\n")
+            print("Creating the embedding matrix ...")
+            self.embedding_matrix = np.zeros((self.vocabulary_size_train + 1, embedding_dim))
+            for word, i in tqdm(self.tokenizer.word_index.items()):
+                embedding_vector = embeddings_index.get(word)
+                if embedding_vector is not None:
+                    # Words not found in embedding index will be all-zeros
+                    self.embedding_matrix[i] = embedding_vector
+
+            # Save the embedding matrix
+            np.save(embedding_matrix_filename, self.embedding_matrix)
+            
     def process_images_train(self, n=100):
         """Resize train and test images and prepocess them accordingly to VGG16
         input.
@@ -175,6 +218,20 @@ class LSTMVGG():
         # for i in range(len(test_image_ids)) if i%3 == 0]
 
         self.train_images = self.process_images_(train_image_ids[:n])
+
+    def process_encode_images_train(self, n=100):
+        """Resize train and test images and prepocess them accordingly to VGG16
+        input.
+        
+        Parameters
+        ----------
+        n : int, optional
+            Number of images to process (for both the train and test sets).
+        """
+        train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
+                           for dic in self.questions_train]
+
+        self.train_images = self.process_encode_images_(train_image_ids[:n])
 
     def process_images_test(self, n=100):
         """Resize train and test images and prepocess them accordingly to VGG16
@@ -236,10 +293,62 @@ class LSTMVGG():
 
         return imgs
 
+    def process_encode_images_(self, image_ids):
+        """Resize images and preprocess them accordingly to VGG16 input.
+        
+        Parameters
+        ----------
+        image_ids : list(tuple)
+            Each tuple is (image_id, data_subtype). The image ids are unique.
+        """
+        vgg_model = keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', 
+                               input_tensor=None, input_shape=None, 
+                               pooling=None, classes=1000)
+
+        # "Submodel" of VGG until the fc7 layer
+        vgg_model_fc7 = Model(inputs=vgg_model.input, outputs=vgg_model.get_layer("fc2").output)
+
+        # List to store the arrays (each array is a vector 4096)
+        embeddings = []
+        # List of images that have been processed {image_id: idx}
+        image_ids_processed = {}
+        # Keep track of the first index corresponding to the first time an 
+        # image has been processed
+        i = 0
+
+        for image_id in tqdm(image_ids):
+            if image_id[0] in image_ids_processed.keys():
+                img = embeddings[image_ids_processed[image_id[0]]]
+            else:
+                # Resize the image (VGG16 input)
+                img = image.load_img(os.path.join(img_dir(self.dataDir, self.dataType, 
+                    image_id[1]), img_file(image_id[1], image_id[0])), target_size=(224, 224)) 
+                # Convert the image to an array
+                img = image.img_to_array(img)
+                # Preprocess the image (VGG16 input)
+                img = preprocess_input(img)
+                # Reshape the image
+                img = img.reshape(1, 224, 224, 3)
+                # Get the embedding for the current image
+                embedding = vgg_model_fc7.predict(img)
+                # Turn the embedding to a vector 
+                embedding = embedding.flatten()
+                # Increment i if the image has not been processed yet
+                image_ids_processed[image_id[0]] = i
+            i += 1
+            embeddings.append(embedding)
+
+        # Put the images together in a single array
+        embeddings = np.stack(embeddings) 
+
+        return embeddings
+
     def get_most_common_answer(self):
         """Get the most common answer for each question of the train and test
         sets.
         """
+        print("Getting the ground truth answer for each question/image in the"
+              " training and test sets ...")
         # For the training set, we select only the answers belonging to the 
         # top 1000 answers
         self.train_answers = self.get_most_common_answer_(self.annotations_train)
@@ -279,6 +388,7 @@ class LSTMVGG():
         top_n : int, optional
             n most frequent answers from the train set.
         """
+        print("Getting the top {} answers from the training set ...".format(top_n))
         # Attribute to be reused in self.encode_answers_
         self.top_n = top_n
 
@@ -290,7 +400,9 @@ class LSTMVGG():
         top_answers_train = [answer for (answer, occ) in 
         Counter(answers_train).most_common(top_n)]
 
-        # Dictionary mapping an index a top answer
+        print("Mapping each top answer to an index between 0 and {} in"
+              " self.idx_to_answer_dic and self.answer_to_idx_dic ...".format(top_n-1))
+        # Dictionary mapping an index to a top answer
         self.idx_to_answer_dic = {i: answer for (i, answer) 
                               in zip(range(top_n), top_answers_train)}
         # Inverse dictionary mapping a top answer to an index
@@ -309,6 +421,8 @@ class LSTMVGG():
         """Reduce the training set answers to the ones which are among the 
         top 1000 answers of the training set.
         """
+        print("Keeping only every question/image with an answer among the top {} answers"
+              " of the training set ...".format(self.top_n))
         self.train_answers = [answer for answer in self.train_answers if answer
                               in self.answer_to_idx_dic.keys()]
         self.questions_train = [question for question in self.questions_train 
@@ -317,6 +431,7 @@ class LSTMVGG():
     def encode_answers(self):
         """Encode train answers and turn the indices into categorical vectors.
         """
+        print("Encoding train and test answers ...")
         self.train_answers_ind = self.encode_answers_(self.train_answers)
         self.train_answers_categorical = to_categorical(self.train_answers_ind)
         # self.test_answers_ind = self.encode_answers_(self.test_answers)
@@ -352,6 +467,34 @@ class LSTMVGG():
             Answer.
         """
         return self.idx_to_answer_dic[idx]
+
+    def clear_variables(self):
+        """Delete variables after processing the data.
+        """
+
+        self.delete_variable(self.questions_train)
+        self.delete_variable(self.questions_test)
+
+        self.delete_variable(self.annotations_train)
+        self.delete_variable(self.annotations_test)
+
+        for dataSubType in self.dataSubTypesTrain:
+            self.delete_variable(getattr(self, "vqa_{}".format(dataSubType)))
+        self.delete_variable(self.vqa_test)
+
+        self.delete_variable(self.train_answers)
+        self.delete_variable(self.test_answers)
+
+        self.delete_variable(self.train_questions)
+        self.delete_variable(self.test_questions)
+
+        self.delete_variable(self.tokenizer)
+
+    def delete_variable(self, variable):
+        try:
+            del variable
+        except:
+            pass
 
     def predictions_to_dic(self, predictions, question_ids):
         """Turn the predictions from the model to the a result list as 
