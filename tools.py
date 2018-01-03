@@ -38,6 +38,16 @@ def glove_dir(dataDir):
     dirname = os.path.join(dataDir, "Glove")
     return dirname
 
+def vgg_embeddings_lstm_vgg_file(dataDir, taskType, dataType, dataSubTypes):
+    if type(dataSubTypes) == list:
+        dataSubTypes = dataSubTypes
+    else:
+        dataSubTypes = [dataSubTypes]
+     
+    filename = os.path.join(dataDir, "Embeddings",
+                            "{}_{}_{}_vgg_embeddings_lstm_vgg.npy"
+                            .format(taskType, dataType, "_".join(dataSubTypes)))
+    return filename
 
 def skipthoughts_npy_file(dataDir, taskType, dataType, dataSubTypes, n):
     if type(dataSubTypes) == list:

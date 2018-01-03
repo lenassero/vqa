@@ -16,7 +16,8 @@ from collections import Counter
 from keras.models import Model
 from tqdm import tqdm
 
-from tools import ann_file, ques_file, img_dir, img_file, glove_dir
+from tools import ann_file, ques_file, img_dir, img_file, glove_dir, \
+                  vgg_embeddings_lstm_vgg_file
 
 class LSTMVGG():
 
@@ -104,23 +105,19 @@ class LSTMVGG():
         # Test annotations
         self.annotations_test = self.vqa_test.dataset["annotations"]
 
-        # # Keep track of the questions ids
-        # self.train_questions_ids = [dic["question_id"]
-        #              for dic in self.questions_train]
-        # self.test_questions_ids = [dic["question_id"]
-        #              for dic in self.questions_test]
+        # Keep track of the questions ids
+        self.train_questions_ids = [dic["question_id"]
+                     for dic in self.questions_train]
+        self.test_questions_ids = [dic["question_id"]
+                     for dic in self.questions_test]
 
-    def tokenize_questions(self):
+    def tokenize_questions_train(self):
         """ Train a tokenizer on the training set questions and tokenize the 
         train and set questions. The resulting sequences are padded to a 
         maximum length corresponding to the longest sentence in the training
         set.
         """
-        # List of questions (we select only the questions in the training set
-        # that correspond to answers belonging to the top 1000 answers of the 
-        # training set)
-        self.test_questions = [dic["question"]
-                     for dic in self.questions_test]
+        # List of questions
         self.train_questions = [dic["question"]
                      for dic in self.questions_train]
 
@@ -136,9 +133,8 @@ class LSTMVGG():
         self.vocabulary_size_train = len(self.tokenizer.word_index.keys())
 
         # Let's use the embedding that has been fit on the training data
-        print("Embedding the train and test questions ...")
+        print("Embedding the train questions ...")
         train_sequences = self.tokenizer.texts_to_sequences(self.train_questions)
-        test_sequences = self.tokenizer.texts_to_sequences(self.test_questions)
         
         # Longest sentence in the training set
         self.input_length = max([len(sequence) for sequence in train_sequences])
@@ -149,6 +145,19 @@ class LSTMVGG():
         self.train_sequences = pad_sequences(train_sequences, 
                                                maxlen=self.input_length, 
                                                padding="post")
+
+    def tokenize_questions_test(self):
+        """Tokenize test questions using the tokenizer fitted on the train
+        questions.
+        """
+        self.test_questions = [dic["question"]
+                     for dic in self.questions_test]
+        
+        print("Embedding the test questions ...")
+        test_sequences = self.tokenizer.texts_to_sequences(self.test_questions)
+
+        print("Padding the sequences to a maximum length of {} ...".\
+              format(self.input_length))
         self.test_sequences = pad_sequences(test_sequences, 
                                                maxlen=self.input_length, 
                                                padding="post")
@@ -156,7 +165,7 @@ class LSTMVGG():
     def create_embedding_matrix(self, embedding_dim=300):
         """Create an embedding matrix of the training set vocabulary using Glove 
         pre-trained embeddings.
-        
+
         Parameters
         ----------
         embedding_dim : int, optional
@@ -192,109 +201,143 @@ class LSTMVGG():
 
             # Save the embedding matrix
             np.save(embedding_matrix_filename, self.embedding_matrix)
-            
-    def process_images_train(self, n=100):
-        """Resize train and test images and prepocess them accordingly to VGG16
-        input.
+
+    # def process_images_train(self, n=100):
+    #     """Resize train and test images and prepocess them accordingly to VGG16
+    #     input.
         
-        Parameters
-        ----------
-        n : int, optional
-            Number of images to process (for both the train and test sets).
-        """
-        # List of tuples (image_id, data_subtype)
-        # Ex: (1, "train2014")
-        # We select only images in the training set that correspond to answers 
-        # belonging to the top 1000 answers of the training set
-        train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
-                           for dic in self.questions_train]
+    #     Parameters
+    #     ----------
+    #     n : int, optional
+    #         Number of images to process (for both the train and test sets).
+    #     """
+    #     # List of tuples (image_id, data_subtype)
+    #     # Ex: (1, "train2014")
+    #     # We select only images in the training set that correspond to answers 
+    #     # belonging to the top 1000 answers of the training set
+    #     train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
+    #                        for dic in self.questions_train]
 
-        # Each image id is replicated three times (3 questions), let's reduce 
-        # the size of the above lists, to avoid encoding the same image three
-        # times
-        # train_image_ids = [train_image_ids[i] 
-        # for i in range(len(train_image_ids)) if i%3 == 0]
-        # test_image_ids = [test_image_ids[i] 
-        # for i in range(len(test_image_ids)) if i%3 == 0]
+    #     # Each image id is replicated three times (3 questions), let's reduce 
+    #     # the size of the above lists, to avoid encoding the same image three
+    #     # times
+    #     # train_image_ids = [train_image_ids[i] 
+    #     # for i in range(len(train_image_ids)) if i%3 == 0]
+    #     # test_image_ids = [test_image_ids[i] 
+    #     # for i in range(len(test_image_ids)) if i%3 == 0]
 
-        self.train_images = self.process_images_(train_image_ids[:n])
+    #     self.train_images = self.process_images_(train_image_ids[:n])
+
+    # def process_images_test(self, n=100):
+    #     """Resize train and test images and prepocess them accordingly to VGG16
+    #     input.
+        
+    #     Parameters
+    #     ----------
+    #     n : int, optional
+    #         Number of images to process (for both the train and test sets).
+    #     """
+    #     # List of tuples (image_id, data_subtype)
+    #     # Ex: (1, "train2014")
+    #     # We select only images in the training set that correspond to answers 
+    #     # belonging to the top 1000 answers of the training set
+    #     test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
+    #                        for dic in self.questions_test]
+    #     self.test_images = self.process_images_(test_image_ids[:n])
 
     def process_encode_images_train(self, n=100):
-        """Resize train and test images and prepocess them accordingly to VGG16
-        input.
+        """Resize train images, prepocess them accordingly to VGG16 input, and 
+        encode them to 4096 vectors with VGG16.
         
         Parameters
         ----------
         n : int, optional
             Number of images to process (for both the train and test sets).
         """
-        train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
-                           for dic in self.questions_train]
+        vgg_embedding_filename = vgg_embeddings_lstm_vgg_file(
+            self.dataDir, self.taskType, self.dataType, self.dataSubTypesTrain)
 
-        self.train_images = self.process_encode_images_(train_image_ids[:n])
+        # Load the VGG embeddings if they have been created
+        if os.path.exists(vgg_embedding_filename):
+            print("Images have already been encoded, opening them ...")
+            self.train_images = np.load(vgg_embedding_filename)
 
-    def process_images_test(self, n=100):
-        """Resize train and test images and prepocess them accordingly to VGG16
-        input.
+        else:
+            train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
+                               for dic in self.questions_train]
+
+            self.train_images = self.process_encode_images(train_image_ids[:n])
+            np.save(vgg_embedding_filename, self.train_images)
+
+    def process_encode_images_test(self, n=100):
+        """Resize test images, prepocess them accordingly to VGG16 input, and 
+        encode them to 4096 vectors with VGG16.
         
         Parameters
         ----------
         n : int, optional
             Number of images to process (for both the train and test sets).
         """
-        # List of tuples (image_id, data_subtype)
-        # Ex: (1, "train2014")
-        # We select only images in the training set that correspond to answers 
-        # belonging to the top 1000 answers of the training set
-        test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
-                           for dic in self.questions_test]
-        self.test_images = self.process_images_(test_image_ids[:n])
+        vgg_embedding_filename = vgg_embeddings_lstm_vgg_file(
+            self.dataDir, self.taskType, self.dataType, self.dataSubTypeTest)
 
+        # Load the VGG embeddings if they have been created
+        if os.path.exists(vgg_embedding_filename):
+            print("Images have already been encoded, opening them ...")
+            self.test_images = np.load(vgg_embedding_filename)
 
-    def process_images_(self, image_ids):
-        """Resize images and preprocess them accordingly to VGG16 input.
+        else:
+            test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
+                               for dic in self.questions_test]
+
+            self.test_images = self.process_encode_images(test_image_ids[:n])
+            np.save(vgg_embedding_filename, self.test_images)
+
+    # def process_images_(self, image_ids):
+    #     """Resize images and preprocess them accordingly to VGG16 input.
         
-        Parameters
-        ----------
-        image_ids : list(tuple)
-            Each tuple is (image_id, data_subtype). The image ids are unique.
-        """
-        # List to store the arrays (each array is an image 224x224x3)
-        imgs = []
-        # List of images that have been processed {image_id: idx}
-        image_ids_processed = {}
-        # Keep track of the first index corresponding to the first time an 
-        # image has been processed
-        i = 0
+    #     Parameters
+    #     ----------
+    #     image_ids : list(tuple)
+    #         Each tuple is (image_id, data_subtype). The image ids are unique.
+    #     """
+    #     # List to store the arrays (each array is an image 224x224x3)
+    #     imgs = []
+    #     # List of images that have been processed {image_id: idx}
+    #     image_ids_processed = {}
+    #     # Keep track of the first index corresponding to the first time an 
+    #     # image has been processed
+    #     i = 0
 
-        for image_id in tqdm(image_ids):
-            if image_id[0] in image_ids_processed.keys():
-                img = imgs[image_ids_processed[image_id[0]]]
-            else:
-                # Resize the image (VGG16 input)
-                img = image.load_img(os.path.join(img_dir(self.dataDir, self.dataType, 
-                    image_id[1]), img_file(image_id[1], image_id[0])), target_size=(224, 224)) 
-                # Convert the image to an array
-                img = image.img_to_array(img)
-                # Increment i if the image has not been processed yet
-                image_ids_processed[image_id[0]] = i
-            i += 1
-            imgs.append(img)
+    #     for image_id in tqdm(image_ids):
+    #         if image_id[0] in image_ids_processed.keys():
+    #             img = imgs[image_ids_processed[image_id[0]]]
+    #         else:
+    #             # Resize the image (VGG16 input)
+    #             img = image.load_img(os.path.join(img_dir(self.dataDir, self.dataType, 
+    #                 image_id[1]), img_file(image_id[1], image_id[0])), target_size=(224, 224)) 
+    #             # Convert the image to an array
+    #             img = image.img_to_array(img)
+    #             # Increment i if the image has not been processed yet
+    #             image_ids_processed[image_id[0]] = i
+    #         i += 1
+    #         imgs.append(img)
 
-        # Put the images together in a single array
-        imgs = np.stack(imgs)
+    #     # Put the images together in a single array
+    #     imgs = np.stack(imgs)
 
-        # Preprocess the images (VGG16 input)
-        imgs = preprocess_input(imgs)   
+    #     # Preprocess the images (VGG16 input)
+    #     imgs = preprocess_input(imgs)   
 
-        # Duplicate the array for each image three times to correspond to the 
-        # number of training questions
-        # imgs = np.repeat(imgs, 3, axis=0)
+    #     # Duplicate the array for each image three times to correspond to the 
+    #     # number of training questions
+    #     # imgs = np.repeat(imgs, 3, axis=0)
 
-        return imgs
+    #     return imgs
 
-    def process_encode_images_(self, image_ids):
-        """Resize images and preprocess them accordingly to VGG16 input.
+    def process_encode_images(self, image_ids):
+        """Resize images, preprocess them accordingly to VGG16 input, and 
+        encode them to 4096 vectors with VGG16.
         
         Parameters
         ----------
@@ -343,22 +386,23 @@ class LSTMVGG():
 
         return embeddings
 
-    def get_most_common_answer(self):
-        """Get the most common answer for each question of the train and test
-        sets.
+    def get_most_common_answer_train(self):
+        self.train_answers = self.get_most_common_answer(self.questions_train, self.annotations_train)
+
+    def get_most_common_answer_test(self):
+        self.test_answers = self.get_most_common_answer(self.questions_test, self.annotations_test)
+
+    def get_most_common_answer(self, questions, annotations):
+        """Get the most common answer for each question.
         """
-        print("Getting the ground truth answer for each question/image in the"
-              " training and test sets ...")
-        # For the training set, we select only the answers belonging to the 
-        # top 1000 answers
-        self.train_answers = self.get_most_common_answer_(self.annotations_train)
-        self.test_answers = self.get_most_common_answer_(self.annotations_test)
+        print("Getting the ground truth answer for each question/image ...")
+        answers = self.get_most_common_answer_(annotations)
 
         # Add the ground truth answers in the questions dictionaries
-        for i in range(len(self.questions_train)):
-            self.questions_train[i]["answer"] = self.train_answers[i]
-        for i in range(len(self.questions_test)):
-            self.questions_test[i]["answer"] = self.test_answers[i]
+        for i in range(len(questions)):
+            questions[i]["answer"] = answers[i]
+
+        return answers
 
     def get_most_common_answer_(self, annotations):
         """Get the most common answer per question (among the 10 answers).
@@ -378,7 +422,7 @@ class LSTMVGG():
                    for annotation in annotations]
         return answers
 
-    def get_top_answers(self, top_n=1000):
+    def get_top_answers_train(self, top_n=1000):
         """Get the top_n answers from the train set (all 10 answers per 
         question are considered) and create dictionaries that map each top 
         answer to an index and vice-versa.
@@ -389,7 +433,7 @@ class LSTMVGG():
             n most frequent answers from the train set.
         """
         print("Getting the top {} answers from the training set ...".format(top_n))
-        # Attribute to be reused in self.encode_answers_
+        # Attribute to be reused in self.encode_answers
         self.top_n = top_n
 
         # All the answers from the train set (10*number of questions)
@@ -409,35 +453,31 @@ class LSTMVGG():
         self.answer_to_idx_dic = {answer: i for (i, answer) 
                               in self.idx_to_answer_dic.items()}
 
-    def reduce_train_qids(self):
-        """Reduce the training set question ids to the ones which are among the 
-        top 1000 answers of the training set.
-        """
-        self.train_questions_ids = [question_id for (question_id, answer) 
-        in zip(self.train_questions_ids, self.train_answers) 
-        if answer in self.answer_to_idx_dic.keys()]
-
-    def reduce_train_answers(self):
+    def reduce_answers_train(self):
         """Reduce the training set answers to the ones which are among the 
         top 1000 answers of the training set.
         """
         print("Keeping only every question/image with an answer among the top {} answers"
               " of the training set ...".format(self.top_n))
+
         self.train_answers = [answer for answer in self.train_answers if answer
                               in self.answer_to_idx_dic.keys()]
+
+        self.train_questions_ids = [question_id for (question_id, answer) 
+        in zip(self.train_questions_ids, self.train_answers) 
+        if answer in self.answer_to_idx_dic.keys()]
+
         self.questions_train = [question for question in self.questions_train 
                                 if question["answer"] in self.answer_to_idx_dic.keys()]
 
-    def encode_answers(self):
+    def encode_answers_train(self):
         """Encode train answers and turn the indices into categorical vectors.
         """
-        print("Encoding train and test answers ...")
-        self.train_answers_ind = self.encode_answers_(self.train_answers)
+        print("Encoding train answers ...")
+        self.train_answers_ind = self.encode_answers(self.train_answers)
         self.train_answers_categorical = to_categorical(self.train_answers_ind)
-        # self.test_answers_ind = self.encode_answers_(self.test_answers)
-        # self.test_answers_categorical = to_categorical(self.test_answers_ind)
 
-    def encode_answers_(self, answers):
+    def encode_answers(self, answers):
         """Encode answers according to the top_n most frequent answers of the 
         training set (from 0 to top_n-1).
         
@@ -468,27 +508,13 @@ class LSTMVGG():
         """
         return self.idx_to_answer_dic[idx]
 
-    def clear_variables(self):
+    def clear_variables(self, category="train"):
         """Delete variables after processing the data.
         """
-
-        self.delete_variable(self.questions_train)
-        self.delete_variable(self.questions_test)
-
-        self.delete_variable(self.annotations_train)
-        self.delete_variable(self.annotations_test)
-
-        for dataSubType in self.dataSubTypesTrain:
-            self.delete_variable(getattr(self, "vqa_{}".format(dataSubType)))
-        self.delete_variable(self.vqa_test)
-
-        self.delete_variable(self.train_answers)
-        self.delete_variable(self.test_answers)
-
-        self.delete_variable(self.train_questions)
-        self.delete_variable(self.test_questions)
-
-        self.delete_variable(self.tokenizer)
+        self.delete_variable(getattr(self, "_".join(("questions", category))))
+        self.delete_variable(getattr(self, "_".join(("annotations", category))))
+        self.delete_variable(getattr(self, "_".join((category, "answers"))))
+        self.delete_variable(getattr(self, "_".join((category, "questions"))))
 
     def delete_variable(self, variable):
         try:
