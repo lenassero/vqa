@@ -159,6 +159,36 @@ def vgg_embeddings_lstm_vgg_file(dataDir, taskType, dataType, dataSubTypes):
                             .format(taskType, dataType, "_".join(dataSubTypes)))
     return filename
 
+def vgg_embeddings_nn_file(dataDir, taskType, dataType, dataSubTypes):
+    """Embedded images file (.pkl) path for the Nearest Neighbors method.
+    
+    Parameters
+    ----------
+    dataDir : str
+        Data directory path.    
+    taskType : str
+        "OpenEnded" only for v2.0. "OpenEnded" or "MultipleChoice" for v1.0.
+    dataType : str
+        "mscoco" only for v1.0. "mscoco" for real and "abstract_v002" for 
+        abstract for v1.0. 
+    dataSubType : str, list
+        As a list or a single string for one dataSubType ("train2014" or 
+        "val2014" for example).
+    
+    Returns
+    -------
+    str
+    """
+    if type(dataSubTypes) == list:
+        dataSubTypes = dataSubTypes
+    else:
+        dataSubTypes = [dataSubTypes]
+     
+    filename = os.path.join(dataDir, "Embeddings",
+                            "{}_{}_{}_vgg_embeddings_nn.pkl"
+                            .format(taskType, dataType, "_".join(dataSubTypes)))
+    return filename
+
 def skipthoughts_npy_file(dataDir, taskType, dataType, dataSubTypes, n):
     if type(dataSubTypes) == list:
         dataSubTypes = dataSubTypes
