@@ -241,7 +241,7 @@ def skipthoughts_test_qid_to_train_knn_qids_file(dataDir, taskType, dataType,
                                     n_test, "_".join(dataSubTypesTrain), n_test, k))
     return filename
 
-def res_file(dataDir, taskType, dataType, dataSubType, methodName):
+def res_file(dataDir, taskType, dataType, dataSubType, methodName, suffix=""):
     """Results file path.
     
     Parameters
@@ -262,12 +262,12 @@ def res_file(dataDir, taskType, dataType, dataSubType, methodName):
     -------
     str
     """
-    filename = os.path.join(dataDir, "Results", "{}_{}_{}_{}_results.json".
-                                format(taskType, dataType, dataSubType, methodName))
+    filename = os.path.join(dataDir, "Results", "{}_{}_{}_{}{}_results.json".
+                                format(taskType, dataType, dataSubType, methodName, suffix))
 
     return filename
 
-def save_results(results, dataDir, taskType, dataType, dataSubType, methodName):
+def save_results(results, dataDir, taskType, dataType, dataSubType, methodName, suffix=""):
     """Save the results obtained with the specific method in the Results 
     directory.
     
@@ -295,7 +295,7 @@ def save_results(results, dataDir, taskType, dataType, dataSubType, methodName):
     """
     print "--> Saving the results"
 
-    results_file = res_file(dataDir, taskType, dataType, dataSubType, methodName)
+    results_file = res_file(dataDir, taskType, dataType, dataSubType, methodName, suffix)
 
     with open(results_file, "w") as f:
         json.dump(results, f)

@@ -5,7 +5,8 @@
 VQA API).
 """
 import matplotlib.pyplot as plt
-import skimage.io as io
+# import skimage.io as io
+from scipy.misc import imread
 import pandas as pd
 import random
 import os
@@ -131,7 +132,8 @@ class Evaluate():
             imgFilename = img_file(self.dataSubType, imgId)
             imgPath = os.path.join(imgDir, imgFilename)
             if os.path.isfile(imgPath):
-                I = io.imread(imgPath)
+                # I = io.imread(imgPath)
+                I = imread(imgPath)
                 plt.imshow(I)
                 plt.axis("off")
                 plt.show()
