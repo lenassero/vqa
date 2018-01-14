@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+""" This class does all the processing for the LSTM VGG model in the notebook
+demos/lstm_vgg_demo.ipynb.
+"""
 import numpy as np
 import keras
 import sys
@@ -17,7 +20,7 @@ from keras.models import Model
 from tqdm import tqdm
 
 from tools import ann_file, ques_file, img_dir, img_file, glove_dir, \
-                  vgg_embeddings_lstm_vgg_file
+                  vgg_embeddings_lstm_vgg_file, save_results
 
 class LSTMVGG():
 
@@ -58,7 +61,6 @@ class LSTMVGG():
                     ann_file(dataDir, versionType, dataType, dataSubType))
             setattr(self, "quesFile_{}".format(dataSubType), 
                     ques_file(dataDir, versionType, taskType, dataType, dataSubType))
-            print(self.annFile_train2014)
 
         # Initialize VQA api for each dataSubType 
         for dataSubType in dataSubTypesTrain:
@@ -97,6 +99,8 @@ class LSTMVGG():
 
         # Initialize VQA api for the self.dataSubTypeTest on which to make predictions
         # on the answers
+        print("\n")
+        print("---> {}".format(dataSubTypeTest))
         self.vqa_test = VQA(self.annFile_test, self.quesFile_test)
         self.questions_test = self.vqa_test.questions["questions"]
         for dic in self.questions_test:
@@ -202,50 +206,7 @@ class LSTMVGG():
             # Save the embedding matrix
             np.save(embedding_matrix_filename, self.embedding_matrix)
 
-    # def process_images_train(self, n=100):
-    #     """Resize train and test images and prepocess them accordingly to VGG16
-    #     input.
-        
-    #     Parameters
-    #     ----------
-    #     n : int, optional
-    #         Number of images to process (for both the train and test sets).
-    #     """
-    #     # List of tuples (image_id, data_subtype)
-    #     # Ex: (1, "train2014")
-    #     # We select only images in the training set that correspond to answers 
-    #     # belonging to the top 1000 answers of the training set
-    #     train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
-    #                        for dic in self.questions_train]
-
-    #     # Each image id is replicated three times (3 questions), let's reduce 
-    #     # the size of the above lists, to avoid encoding the same image three
-    #     # times
-    #     # train_image_ids = [train_image_ids[i] 
-    #     # for i in range(len(train_image_ids)) if i%3 == 0]
-    #     # test_image_ids = [test_image_ids[i] 
-    #     # for i in range(len(test_image_ids)) if i%3 == 0]
-
-    #     self.train_images = self.process_images_(train_image_ids[:n])
-
-    # def process_images_test(self, n=100):
-    #     """Resize train and test images and prepocess them accordingly to VGG16
-    #     input.
-        
-    #     Parameters
-    #     ----------
-    #     n : int, optional
-    #         Number of images to process (for both the train and test sets).
-    #     """
-    #     # List of tuples (image_id, data_subtype)
-    #     # Ex: (1, "train2014")
-    #     # We select only images in the training set that correspond to answers 
-    #     # belonging to the top 1000 answers of the training set
-    #     test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
-    #                        for dic in self.questions_test]
-    #     self.test_images = self.process_images_(test_image_ids[:n])
-
-    def process_encode_images_train(self, n=100):
+    def process_encode_images_train(self):
         """Resize train images, prepocess them accordingly to VGG16 input, and 
         encode them to 4096 vectors with VGG16.
         
@@ -266,10 +227,10 @@ class LSTMVGG():
             train_image_ids = [(dic["image_id"], dic["data_subtype"]) 
                                for dic in self.questions_train]
 
-            self.train_images = self.process_encode_images(train_image_ids[:n])
+            self.train_images = self.process_encode_images(train_image_ids)
             np.save(vgg_embedding_filename, self.train_images)
 
-    def process_encode_images_test(self, n=100):
+    def process_encode_images_test(self):
         """Resize test images, prepocess them accordingly to VGG16 input, and 
         encode them to 4096 vectors with VGG16.
         
@@ -290,7 +251,7 @@ class LSTMVGG():
             test_image_ids = [(dic["image_id"], dic["data_subtype"]) 
                                for dic in self.questions_test]
 
-            self.test_images = self.process_encode_images(test_image_ids[:n])
+            self.test_images = self.process_encode_images(test_image_ids)
             np.save(vgg_embedding_filename, self.test_images)
 
     # def process_images_(self, image_ids):
@@ -344,7 +305,7 @@ class LSTMVGG():
         image_ids : list(tuple)
             Each tuple is (image_id, data_subtype). The image ids are unique.
         """
-        vgg_model = keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', 
+        vgg_model = keras.applications.vgg16.VGG16(include_top=True, weights="imagenet", 
                                input_tensor=None, input_shape=None, 
                                pooling=None, classes=1000)
 
@@ -552,9 +513,7 @@ class LSTMVGG():
         for (answer, question_id) in zip(answers_pred, question_ids)]
 
         # Save the results
-        # save_results(res, self.dataDir, self.taskType, self.dataType, dataSubType, 
-        #              self.__class__.__name__)
-
-        return res
-
+        self.results_file = save_results(res, self.dataDir, self.taskType, 
+                                         self.dataType, self.dataSubTypeTest, 
+                                         self.__class__.__name__)
 

@@ -7,6 +7,10 @@ cosine similarity after encoding the questions in skip-thought feature space.
 Then, in this set of k questions and their associated images, we find the image 
 which is most similar to the query image using cosine similarity after encoding 
 the images with the fc7 features from the VGG16 model.
+
+BEFORE USING THIS CLASS:
+Please change the paths in skip_thoughts/skithoughts.py to the model files and
+word embeddings (https://github.com/ryankiros/skip-thoughts).
 """
 import cPickle as pkl
 import numpy as np
@@ -26,8 +30,8 @@ from tools import ann_file, img_file, ques_file, img_dir,\
                   skipthoughts_test_qid_to_train_knn_qids_file,\
                   save_results, vgg_embeddings_nn_file
 from vqa_api.PythonHelperTools.vqaTools.vqa import VQA
+from skip_thoughts import skipthoughts
 from utils import chunking_dot
-# from skip_thoughts import skipthoughts
 
 
 class NearestNeighbors():
@@ -104,8 +108,8 @@ class NearestNeighbors():
         # Load the skipthoughts model and initialize the encoder
         print("\n")
         print("---> Loading the skipthoughts model ...")
-        # self.model = skipthoughts.load_model()
-        # self.encoder = skipthoughts.Encoder(self.model)
+        self.model = skipthoughts.load_model()
+        self.encoder = skipthoughts.Encoder(self.model)
 
         # Load vggnet fc7 layer
         print("\n")
